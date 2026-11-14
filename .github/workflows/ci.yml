@@ -21,5 +21,7 @@ jobs:
         run: node --check server.mjs
       - name: Check frontend syntax
         run: node --check public/app.js
+      - name: Run authentication tests
+        run: node --test test/*.test.mjs
       - name: Build Docker image
         run: docker build -t parsec-admin-tool:ci .

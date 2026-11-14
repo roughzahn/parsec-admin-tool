@@ -25,6 +25,7 @@ A standalone, optional Docker service for human-facing operations visibility and
 - Audio streaming is proxied without a short request timeout and supports byte-range playback.
 - Optional Compose profile `admin`; core Parsec services do not depend on this container.
 - Local E2E port is bound to `127.0.0.1:18767` only.
+- Optional UI password protection is controlled by PARSEC_ADMIN_PASSWORD. When empty, local development has no login prompt. When non-empty, all Admin API routes require a 12-hour HttpOnly/SameSite session cookie; production also forces the Secure cookie attribute. Login attempts are rate-limited. The health probe uses a separate /healthz endpoint.
 - Containers use `Europe/Berlin`.
 
 ## Run locally
@@ -65,4 +66,4 @@ The first release starts at `0.1.0` when minor is selected. Releases never deplo
 
 ## Production
 
-Not wired into production Compose, Nginx, or deployments. Production integration remains an explicit later decision.
+Production integration is managed by the Gateway repository Compose and Nginx configuration. Production Compose requires a non-empty PARSEC_ADMIN_PASSWORD; local E2E Compose may leave it empty. The Admin container has no published host port and is reachable only through the /admin/ Nginx route. Production access must use HTTPS; the password must never be submitted over plain HTTP.
