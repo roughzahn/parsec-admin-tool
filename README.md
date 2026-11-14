@@ -6,7 +6,7 @@ A standalone, optional Docker service for human-facing operations visibility and
 
 - Live library inventory and total bytes.
 - Analysis queue counters: queued, leased, completed, and dead-lettered jobs.
-- Worker cards with CPU/GPU type, capabilities, model, capacity, active jobs, and heartbeat status.
+- Worker cards with CPU/GPU type, lifecycle state (`STARTING`, `READY`, `OFFLINE`), capabilities, model, capacity, active jobs, and heartbeat status.
 - Latest 20 jobs with path, status, worker, attempts, timestamps, and visible failure reason.
 - Latest library scan and Search ingestion/deletion outbox counters.
 - Search test form via Gateway and playback via short-lived stream tickets.
