@@ -9,3 +9,7 @@
 .login-error{min-height:1.4em;color:var(--red);font-size:.9rem}
 #logoutButton{margin-right:10px;font-size:.8rem;padding:7px 10px}
 #logoutButton[hidden]{display:none}
+/* Keep the login form vertical; the global form rule is intended for the search form. */
+.login-card{display:flex;flex-direction:column;align-items:stretch}
+.login-card input{flex:none;width:100%;height:48px}
+.login-card button{flex:none;min-height:46px}
