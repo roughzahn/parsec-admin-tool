@@ -53,6 +53,16 @@ The local token is stored in the ignored E2E `.env` file. Do not copy it into so
 - `POST /api/tracks/:trackId/stream-ticket` - Gateway short-lived stream ticket.
 - `GET /api/stream/:ticketId` - streamed audio proxy, including byte-range requests.
 
+## Stable releases
+
+Stable releases are published manually from GitHub Actions:
+
+1. Open **Actions > Release > Run workflow** on `main`.
+2. Select the semantic-version increment (`major`, `minor`, or `patch`).
+3. The workflow validates the source, builds and pushes `ghcr.io/roughzahn/parsec-admin-tool:<version>` and `ghcr.io/roughzahn/parsec-admin-tool:stable`, then creates the matching GitHub Release and `v<version>` tag.
+
+The first release starts at `0.1.0` when minor is selected. Releases never deploy the Admin Tool to production.
+
 ## Production
 
-Not wired into production Compose, Nginx, release workflows, or deployments. Production integration remains an explicit later decision.
+Not wired into production Compose, Nginx, or deployments. Production integration remains an explicit later decision.
