@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(root, 'public');
@@ -10,11 +11,66 @@ const port = Number(process.env.PARSEC_ADMIN_PORT || 3000);
 const gateway = (process.env.PARSEC_GATEWAY_BASE_URL || 'http://gateway:8080').replace(/\/$/, '');
 const search = (process.env.PARSEC_SEARCH_BASE_URL || 'http://search:8000').replace(/\/$/, '');
 const token = process.env.PARSEC_ADMIN_INTERNAL_TOKEN || '';
-const json = (res, status, body) => { res.writeHead(status, {'content-type':'application/json; charset=utf-8','cache-control':'no-store'}); res.end(JSON.stringify(body)); };
+const adminPassword = process.env.PARSEC_ADMIN_PASSWORD ?? '';
+const forceSecureCookies = process.env.PARSEC_ADMIN_COOKIE_SECURE === 'true';
+const sessionLifetimeMs = 12 * 60 * 60 * 1000;
+const sessions = new Map();
+const loginFailures = new Map();
+const json = (res, status, body, headers={}) => { res.writeHead(status, {'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}); res.end(JSON.stringify(body)); };
 async function readBody(req) { let raw=''; for await (const c of req) { raw+=c; if(raw.length>32768) throw Error('Request too large'); } return raw?JSON.parse(raw):{}; }
 const get = (url, options={}) => fetch(url,{...options,signal:AbortSignal.timeout(15000)});
+function cookieValue(req,name) {
+ const raw=req.headers.cookie||'';
+ for(const part of raw.split(';')) { const i=part.indexOf('='); if(i>0&&part.slice(0,i).trim()===name)return decodeURIComponent(part.slice(i+1).trim()); }
+ return '';
+}
+function currentSession(req) {
+ const id=cookieValue(req,'parsec_admin_session');
+ const expires=sessions.get(id);
+ if(!id||!expires)return false;
+ if(expires<=Date.now()){sessions.delete(id);return false;}
+ return true;
+}
+function passwordMatches(candidate) {
+ const expected=createHash('sha256').update(adminPassword,'utf8').digest();
+ const actual=createHash('sha256').update(String(candidate??''),'utf8').digest();
+ return timingSafeEqual(expected,actual);
+}
+function secureCookie(req) {
+ return forceSecureCookies || req.socket.encrypted===true || String(req.headers['x-forwarded-proto']||'').split(',')[0].trim()==='https';
+}
+function sessionCookie(req,id,maxAge) {
+ return 'parsec_admin_session='+encodeURIComponent(id)+'; Path=/; HttpOnly; SameSite=Strict; Max-Age='+maxAge+(secureCookie(req)?'; Secure':'');
+}
+function authStatus(req) {
+ return {passwordRequired:adminPassword.length>0,authenticated:adminPassword.length===0||currentSession(req)};
+}
 async function handle(req,res) {
  const url=new URL(req.url,`http://${req.headers.host||'localhost'}`);
+  if(req.method==='GET'&&url.pathname==='/api/auth/status') return json(res,200,authStatus(req));
+ if(req.method==='POST'&&url.pathname==='/api/auth/login') {
+  if(!adminPassword)return json(res,200,{ok:true,passwordRequired:false});
+  const ip=req.headers['x-real-ip']||req.socket.remoteAddress||'unknown',now=Date.now(),failure=loginFailures.get(ip);
+  if(failure&&failure.blockedUntil>now)return json(res,429,{error:'Zu viele Fehlversuche. Bitte spaeter erneut versuchen.'});
+  const payload=await readBody(req);
+  if(!passwordMatches(payload.password)) {
+   const inWindow=failure&&failure.windowStart>now-15*60*1000;
+   const next=inWindow?failure.count+1:1;
+   loginFailures.set(ip,{count:next,windowStart:inWindow?failure.windowStart:now,blockedUntil:next>=5?now+15*60*1000:0});
+   return json(res,401,{error:'Das Passwort ist nicht korrekt.'});
+  }
+  loginFailures.delete(ip);
+  for(const [id,expires] of sessions)if(expires<=now)sessions.delete(id);
+  const sessionId=randomBytes(32).toString('base64url');
+  sessions.set(sessionId,now+sessionLifetimeMs);
+  return json(res,200,{ok:true},{'set-cookie':sessionCookie(req,sessionId,sessionLifetimeMs/1000)});
+ }
+ if(req.method==='POST'&&url.pathname==='/api/auth/logout') {
+  const id=cookieValue(req,'parsec_admin_session');if(id)sessions.delete(id);
+  return json(res,200,{ok:true},{'set-cookie':sessionCookie(req,'',0)});
+ }
+ if(req.method==='GET'&&url.pathname==='/healthz') return json(res,200,{status:'UP'});
+ if(adminPassword&&!currentSession(req)&&url.pathname.startsWith('/api/')) return json(res,401,{error:'Anmeldung erforderlich'});
  if(req.method==='GET'&&url.pathname==='/api/health') {
   const checks=await Promise.allSettled([get(`${gateway}/actuator/health/readiness`),get(`${search}/health`)]);
   const parse=async x=>x.status==='fulfilled'?{reachable:x.value.ok,status:x.value.status,details:await x.value.json().catch(()=>({}))}:{reachable:false,error:'unreachable'};
@@ -50,7 +106,7 @@ async function handle(req,res) {
  if(req.method!=='GET'&&req.method!=='HEAD')return json(res,405,{error:'Method not allowed'});
  const name=url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1)),file=path.resolve(publicDir,name);
  if(!file.startsWith(publicDir+path.sep))return json(res,404,{error:'Not found'});
- try {const data=await readFile(file),type=file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':file.endsWith('.js')?'text/javascript; charset=utf-8':'application/octet-stream';res.writeHead(200,{'content-type':type,'cache-control':file.endsWith('.html')?'no-store':'public, max-age=300'});res.end(req.method==='HEAD'?undefined:data);}
+ try {const data=await readFile(file),type=file.endsWith('.html')?'text/html; charset=utf-8':file.endsWith('.css')?'text/css; charset=utf-8':file.endsWith('.js')?'text/javascript; charset=utf-8':'application/octet-stream';res.writeHead(200,{'content-type':type,'cache-control':file.endsWith('.html')?'no-store':'public, max-age=300','x-content-type-options':'nosniff','referrer-policy':'same-origin','x-frame-options':'DENY'});res.end(req.method==='HEAD'?undefined:data);}
  catch{return json(res,404,{error:'Not found'});}
 }
 http.createServer((req,res)=>handle(req,res).catch(e=>{console.error('Admin request failed:',e.message);if(!res.headersSent)json(res,502,{error:'Upstream service unavailable'});else res.destroy();})).listen(port,'0.0.0.0',()=>console.log(`Parsec Admin Tool listening on ${port}`));
