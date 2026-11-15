@@ -95,6 +95,15 @@ async function handle(req,res) {
   });
   return json(res,r.status,await r.json().catch(()=>({ok:r.ok,error:'Invalid Gateway response'})));
  }
+ const gpuWorkerRevoke=url.pathname.match(/^\/api\/gpu-workers\/([A-Za-z0-9_-]+)\/session$/);
+ if(req.method==='DELETE'&&gpuWorkerRevoke) {
+  if(!token)return json(res,503,{error:'Admin credential is not configured'});
+  const workerId=encodeURIComponent(gpuWorkerRevoke[1]);
+  const r=await get(`${gateway}/internal/v1/admin/gpu-workers/${workerId}/session`,{
+   method:'DELETE',headers:{authorization:`Bearer ${token}`}
+  });
+  return json(res,r.status,await r.json().catch(()=>({ok:r.ok,error:r.ok?undefined:'Invalid Gateway response'})));
+ }
  if(req.method==='POST'&&url.pathname==='/api/search') {
   const payload=await readBody(req),r=await get(`${gateway}/api/v1/search`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:String(payload.query||'')})});
   return json(res,r.status,await r.json().catch(()=>({error:'Invalid search response'})));
