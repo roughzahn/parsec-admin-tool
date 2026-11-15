@@ -23,3 +23,5 @@
 .pairing-actions button{padding:9px 13px}
 .pairing-actions .reject{background:#7b3540}
 @media(max-width:650px){.pairing-request{align-items:stretch;flex-direction:column}.pairing-actions{justify-content:flex-start}}
+
+.worker-actions{display:flex;justify-content:flex-end;margin-top:10px}.worker-actions button{padding:8px 12px;background:#7b3540}
