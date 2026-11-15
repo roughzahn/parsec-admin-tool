@@ -5,7 +5,31 @@ $('workerCount').textContent=n(d.workers?.length)+' Worker';$('workers').innerHT
 const i=d.ingestionOutbox||{},x=d.deletionOutbox||{};$('ingestionPending').textContent=n(i.pending)+' offen';$('ingestionMeta').textContent=n(i.delivered)+' zugestellt · '+n(i.dead)+' endgültige Fehler';$('deletionPending').textContent=n(x.pending)+' offen';$('deletionMeta').textContent=n(x.delivered)+' zugestellt · '+n(x.dead)+' endgültige Fehler';
 const jobs=d.recentJobs||[];$('jobCount').textContent=jobs.length+' zuletzt';$('jobs').innerHTML=jobs.map(x=>'<tr><td title="'+esc(x.path)+'">'+esc(x.path)+'</td><td><span class="state '+String(x.status).toLowerCase()+'">'+esc(x.status)+'</span></td><td>'+esc(x.workerId||'—')+'</td><td>'+n(x.attempt)+' / '+n(x.maxAttempts)+'</td><td>'+date(x.updatedAt)+'</td><td class="error-cell" title="'+esc(x.lastError||'')+'">'+esc(x.lastError||'—')+'</td></tr>').join('')||'<tr><td colspan="6">Noch keine Jobs vorhanden.</td></tr>';
 $('updated').textContent='Aktualisiert '+date(d.generatedAt);const s=d.latestScan;$('scanInfo').textContent=s?'Letzter Scan: '+s.status+' · '+n(s.filesSeen)+' Dateien · '+date(s.completedAt||s.startedAt):'Noch kein Bibliotheks-Scan';}
-async function refresh(){try{const [o,h]=await Promise.all([fetch('api/overview').then(r=>{if(r.status===401){showLogin();throw Error('Anmeldung erforderlich');}if(!r.ok)throw Error('Gateway '+r.status);return r.json()}),fetch('api/health').then(r=>r.json())]);render(o);const ok=h.gateway?.reachable&&h.search?.reachable;$('systemDot').style.background=ok?'var(--green)':'var(--red)';$('systemStatus').textContent=ok?'Gateway & Search bereit':'Service prüfen';}catch(e){$('systemDot').style.background='var(--red)';$('systemStatus').textContent='Verbindung gestört';$('updated').textContent=e.message;}}
+function renderPairing(items){
+ const host=$('gpuPairing');
+ if(!items.length){host.innerHTML='<div class="empty">Keine offenen GPU-Anfragen.</div>';return;}
+ host.innerHTML=items.map(w=>'<article class="pairing-request"><div class="pairing-info"><b>'+esc(w.workerId)+'</b><span class="type gpu">GPU · wartet auf Freigabe</span><small>Hostname (vom Worker gemeldet): '+esc(w.hostname)+'</small><small>Version: '+esc(w.workerVersion||'—')+' · Modell: '+esc(w.modelId)+'</small><small>Capabilities: '+esc((w.capabilities||[]).join(', ')||'—')+'</small><small>Angefragt: '+date(w.createdAt)+' · Ablauf: '+date(w.expiresAt)+'</small></div><div class="pairing-actions"><button data-pairing-action="approve" data-registration="'+esc(w.registrationId)+'">Freigeben</button><button class="reject" data-pairing-action="reject" data-registration="'+esc(w.registrationId)+'">Ablehnen</button></div></article>').join('');
+}
+async function refresh(){
+ try{
+  const [o,h,p]=await Promise.all([
+   fetch('api/overview').then(r=>{if(r.status===401){showLogin();throw Error('Anmeldung erforderlich');}if(!r.ok)throw Error('Gateway '+r.status);return r.json()}),
+   fetch('api/health').then(r=>r.json()),
+   fetch('api/gpu-worker-registrations').then(r=>r.ok?r.json():[])
+  ]);
+  render(o);renderPairing(Array.isArray(p)?p:[]);
+  const ok=h.gateway?.reachable&&h.search?.reachable;$('systemDot').style.background=ok?'var(--green)':'var(--red)';$('systemStatus').textContent=ok?'Gateway & Search bereit':'Service prüfen';
+ }catch(e){$('systemDot').style.background='var(--red)';$('systemStatus').textContent='Verbindung gestört';$('updated').textContent=e.message;}
+}
+$('gpuPairing').addEventListener('click',async e=>{
+ const b=e.target.closest('button[data-pairing-action]');if(!b)return;
+ b.disabled=true;
+ try{
+  const r=await fetch('api/gpu-worker-registrations/'+encodeURIComponent(b.dataset.registration)+'/'+b.dataset.pairingAction,{method:'POST'});
+  if(!r.ok){const d=await r.json().catch(()=>({}));throw Error(d.error||'HTTP '+r.status);}
+  await refresh();
+ }catch(err){b.disabled=false;alert('GPU-Freigabe fehlgeschlagen: '+err.message);}
+});
 $('searchForm').addEventListener('submit',async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;$('results').textContent='Suche läuft …';try{const r=await fetch('api/search',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:$('query').value})}),d=await r.json();if(!r.ok)throw Error(d.message||d.error||'HTTP '+r.status);$('results').className='results';$('results').innerHTML=(d.results||[]).map(x=>'<div class="result"><div><b>'+esc(x.title||x.trackId)+'</b><small>Rang '+n(x.rank)+' · Score '+Number(x.score||0).toFixed(3)+' · '+esc(x.trackId)+'</small></div><button data-track="'+esc(x.trackId)+'">▶ Abspielen</button></div>').join('')||'Keine Treffer.';}catch(err){$('results').textContent='Suche fehlgeschlagen: '+err.message;}finally{b.disabled=false;}});
 $('results').addEventListener('click',async e=>{const b=e.target.closest('button[data-track]');if(!b)return;b.disabled=true;try{const r=await fetch('api/tracks/'+encodeURIComponent(b.dataset.track)+'/stream-ticket',{method:'POST'}),t=await r.json();if(!r.ok)throw Error('HTTP '+r.status);let p=$('player');if(!p){p=document.createElement('audio');p.id='player';p.controls=true;p.style.width='100%';$('results').prepend(p);}p.src='api/stream/'+encodeURIComponent(t.ticketId);await p.play();}catch(err){b.textContent='Fehler: '+err.message;}finally{b.disabled=false;}});
 let refreshTimer;
