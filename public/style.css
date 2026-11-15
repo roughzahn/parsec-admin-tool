@@ -13,3 +13,13 @@
 .login-card{display:flex;flex-direction:column;align-items:stretch}
 .login-card input{flex:none;width:100%;height:48px}
 .login-card button{flex:none;min-height:46px}
+
+.pairing-list{display:grid;gap:12px}
+.pairing-request{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:15px;border:1px solid var(--line);border-radius:12px;background:#0f1728}
+.pairing-info{display:grid;gap:4px;min-width:0}
+.pairing-info b{font-size:15px}
+.pairing-info small{color:var(--muted);overflow-wrap:anywhere}
+.pairing-actions{display:flex;gap:8px;flex-shrink:0}
+.pairing-actions button{padding:9px 13px}
+.pairing-actions .reject{background:#7b3540}
+@media(max-width:650px){.pairing-request{align-items:stretch;flex-direction:column}.pairing-actions{justify-content:flex-start}}
