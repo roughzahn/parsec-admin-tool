@@ -81,6 +81,20 @@ async function handle(req,res) {
   const r=await get(`${gateway}/internal/v1/admin/overview`,{headers:{authorization:`Bearer ${token}`}});
   return json(res,r.status,await r.json().catch(()=>({error:'Invalid Gateway response'})));
  }
+ if(req.method==='GET'&&url.pathname==='/api/gpu-worker-registrations') {
+  if(!token)return json(res,503,{error:'Admin credential is not configured'});
+  const r=await get(`${gateway}/internal/v1/admin/gpu-worker-registrations`,{headers:{authorization:`Bearer ${token}`}});
+  return json(res,r.status,await r.json().catch(()=>({error:'Invalid Gateway response'})));
+ }
+ const pairingAction=url.pathname.match(/^\/api\/gpu-worker-registrations\/([A-Za-z0-9_-]+)\/(approve|reject)$/);
+ if(req.method==='POST'&&pairingAction) {
+  if(!token)return json(res,503,{error:'Admin credential is not configured'});
+  const registrationId=encodeURIComponent(pairingAction[1]),action=pairingAction[2];
+  const r=await get(`${gateway}/internal/v1/admin/gpu-worker-registrations/${registrationId}/${action}`,{
+   method:'POST',headers:{authorization:`Bearer ${token}`}
+  });
+  return json(res,r.status,await r.json().catch(()=>({ok:r.ok,error:'Invalid Gateway response'})));
+ }
  if(req.method==='POST'&&url.pathname==='/api/search') {
   const payload=await readBody(req),r=await get(`${gateway}/api/v1/search`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({query:String(payload.query||'')})});
   return json(res,r.status,await r.json().catch(()=>({error:'Invalid search response'})));
