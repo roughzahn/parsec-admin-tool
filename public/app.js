@@ -1,26 +1,10 @@
 const $=id=>document.getElementById(id),n=v=>Number(v||0).toLocaleString('de-DE'),date=v=>v?new Date(v).toLocaleString('de-DE'):'—',esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function render(d){const j=d.jobs||{},total=Object.values(j).reduce((a,b)=>a+Number(b||0),0),done=+j.completed||0,active=+j.leased||0,queued=+j.queued||0,dead=+j.dead||0,pct=total?Math.round(done/total*100):0;
 $('tracks').textContent=n(d.inventory?.totalTracks);$('leased').textContent=n(active);$('queued').textContent=n(queued);$('completed').textContent=n(done);$('progress').textContent='von '+n(total)+' Jobs';$('dead').textContent=n(dead);$('progressPct').textContent=pct+'%';$('progressBar').style.width=pct+'%';
-$('workerCount').textContent=n(d.workers?.length)+' Worker';$('workers').innerHTML=(d.workers||[]).map(w=>{const status=w.workerType==='CPU'&&d.loadProtection?.workerPaused?'PAUSED':w.status||(w.online?'READY':'OFFLINE'),label={STARTING:'Startet',READY:'Bereit',IDLE:'Leerlauf · Modell entladen',OFFLINE:'Offline',PAUSED:'Pausiert'}[status]||status;return '<article class="worker"><div class="worker-top"><b>'+esc(w.workerId)+'</b><span class="type '+(w.workerType==='GPU'?'gpu':'')+'">'+esc(w.workerType)+'</span></div><div class="worker-meta"><span class="worker-status '+String(status).toLowerCase()+'">● '+esc(label)+'</span> · '+n(w.activeJobs)+' / '+n(w.maxConcurrentJobs)+' Jobs<br>Modell: '+esc(w.modelId)+'<br>Heartbeat: '+date(w.lastSeenAt)+'<br>Capabilities: '+esc((w.capabilities||[]).join(', ')||'—')+'</div>'+(w.workerType==='GPU'?'<div class="worker-actions"><button class="reject" data-worker-action="revoke" data-worker-id="'+esc(w.workerId)+'">Session entziehen</button></div>':'')+'</article>';}).join('')||'Noch keine Worker registriert.';
+$('workerCount').textContent=n(d.workers?.length)+' Worker';$('workers').innerHTML=(d.workers||[]).map(w=>{const status=w.status||(w.online?'READY':'OFFLINE'),label={STARTING:'Startet',READY:'Bereit',IDLE:'Leerlauf · Modell entladen',OFFLINE:'Offline',PAUSED:'Pausiert'}[status]||status;return '<article class="worker"><div class="worker-top"><b>'+esc(w.workerId)+'</b><span class="type '+(w.workerType==='GPU'?'gpu':'')+'">'+esc(w.workerType)+'</span></div><div class="worker-meta"><span class="worker-status '+String(status).toLowerCase()+'">● '+esc(label)+'</span> · '+n(w.activeJobs)+' / '+n(w.maxConcurrentJobs)+' Jobs<br>Modell: '+esc(w.modelId)+'<br>Heartbeat: '+date(w.lastSeenAt)+'<br>Capabilities: '+esc((w.capabilities||[]).join(', ')||'—')+'</div>'+(w.workerType==='GPU'?'<div class="worker-actions"><button class="reject" data-worker-action="revoke" data-worker-id="'+esc(w.workerId)+'">Session entziehen</button></div>':'')+'</article>';}).join('')||'Noch keine Worker registriert.';
 const i=d.ingestionOutbox||{},x=d.deletionOutbox||{};$('ingestionPending').textContent=n(i.pending)+' offen';$('ingestionMeta').textContent=n(i.delivered)+' zugestellt · '+n(i.dead)+' endgültige Fehler';$('deletionPending').textContent=n(x.pending)+' offen';$('deletionMeta').textContent=n(x.delivered)+' zugestellt · '+n(x.dead)+' endgültige Fehler';
 const jobs=d.recentJobs||[];$('jobCount').textContent=jobs.length+' zuletzt';$('jobs').innerHTML=jobs.map(x=>'<tr><td title="'+esc(x.path)+'">'+esc(x.path)+'</td><td><span class="state '+String(x.status).toLowerCase()+'">'+esc(x.status)+'</span></td><td>'+esc(x.workerId||'—')+'</td><td>'+n(x.attempt)+' / '+n(x.maxAttempts)+'</td><td>'+date(x.updatedAt)+'</td><td class="error-cell" title="'+esc(x.lastError||'')+'">'+esc(x.lastError||'—')+'</td></tr>').join('')||'<tr><td colspan="6">Noch keine Jobs vorhanden.</td></tr>';
 $('updated').textContent='Aktualisiert '+date(d.generatedAt);const s=d.latestScan;$('scanInfo').textContent=s?'Letzter Scan: '+s.status+' · '+n(s.filesSeen)+' Dateien · '+date(s.completedAt||s.startedAt):'Noch kein Bibliotheks-Scan';}
-function renderLoadProtection(p){
- const panel=$('loadProtectionPanel'),status=p?.status||'METRICS_UNAVAILABLE',metrics=p?.metrics||{};
- const labels={NORMAL:'Normal',WARNING:'Erhöhte Last',PAUSED:'CPU-Worker pausiert',METRICS_UNAVAILABLE:'Metriken nicht verfügbar',DISABLED:'Deaktiviert'};
- panel.className='panel load-protection '+(status==='METRICS_UNAVAILABLE'?'unavailable':status==='PAUSED'?'paused':status==='WARNING'?'warning':'');
- $('loadProtectionStatus').textContent=labels[status]||status;
- $('loadProtectionMessage').textContent=p?.reason||'Das Gateway liefert keinen Status der Host-Lastüberwachung.';
- const error=p?.lastError||(!p?'Gateway-Metrikstatus fehlt.':'');
- $('loadProtectionError').hidden=!error;
- $('loadProtectionError').textContent=error?'Messfehler: '+error:'';
- const mb=v=>v==null?'—':(Number(v)/1024/1024).toLocaleString('de-DE',{maximumFractionDigits:0})+' MiB';
- const pct=v=>v==null?'—':Number(v).toLocaleString('de-DE',{maximumFractionDigits:1})+'%';
- $('loadProtectionMetrics').innerHTML='<span>RAM verfügbar: <b>'+mb(metrics.memoryAvailableBytes)+'</b> ('+pct(metrics.memoryAvailablePercent)+')</span><span>CLAP-Ladereserve: <b>'+mb(p?.cpuWorkerModelReserveBytes)+'</b></span><span>CPU: <b>'+pct(metrics.cpuUsagePercent)+'</b></span><span>Memory PSI: <b>'+pct(metrics.memoryPsiSomeAvg10)+'</b></span><span>CPU PSI: <b>'+pct(metrics.cpuPsiSomeAvg10)+'</b></span><span>I/O PSI: <b>'+pct(metrics.ioPsiFullAvg10)+'</b></span>';
- let timing='Letzte Messung: '+date(p?.lastSampleAt);
- if(p?.pausedUntil){const seconds=Math.max(0,Math.ceil((new Date(p.pausedUntil)-Date.now())/1000));timing+=' · Reststrafe: '+Math.floor(seconds/60)+'m '+(seconds%60)+'s';}
- $('loadProtectionTiming').textContent=timing;
-}
 function renderPairing(items){
  const host=$('gpuPairing');
  if(!items.length){host.innerHTML='<div class="empty">Keine offenen GPU-Anfragen.</div>';return;}
@@ -36,13 +20,14 @@ async function refresh(){
    fetch('api/health').then(r=>r.json()),
    fetch('api/gpu-worker-registrations').then(r=>r.ok?r.json():[])
   ]);
-  render(o);renderLoadProtection(o.loadProtection);renderPairing(Array.isArray(p)?p:[]);
-  const loadStatus=o.loadProtection?.status;
+  render(o);renderPairing(Array.isArray(p)?p:[]);
   const ok=h.gateway?.reachable&&h.search?.reachable;
-  $('systemDot').style.background=loadStatus==='METRICS_UNAVAILABLE'?'var(--red)':loadStatus==='PAUSED'||loadStatus==='WARNING'?'var(--yellow)':ok?'var(--green)':'var(--red)';
-  $('systemStatus').textContent=loadStatus==='METRICS_UNAVAILABLE'?'Server-Metriken prüfen':loadStatus==='PAUSED'?'CPU-Worker pausiert':loadStatus==='WARNING'?'Serverlast erhöht':ok?'Gateway & Search bereit':'Service prüfen';
- }catch(e){$('systemDot').style.background='var(--red)';$('systemStatus').textContent='Verbindung gestört';$('updated').textContent=e.message;renderLoadProtection({status:'METRICS_UNAVAILABLE',reason:'Gateway nicht erreichbar. Der Status der Host-Metriken kann nicht bestätigt werden.',lastError:e.message});}
- finally{refreshInFlight=false;}
+  $('systemDot').style.background=ok?'var(--green)':'var(--red)';
+  $('systemStatus').textContent=ok?'Gateway & Search bereit':'Service pr\u00fcfen';
+ }catch(e){
+  $('systemDot').style.background='var(--red)';
+  $('systemStatus').textContent='Verbindung gest\u00f6rt';
+  $('updated').textContent=e.message; } finally{refreshInFlight=false;}
 }
 $('gpuPairing').addEventListener('click',async e=>{
  const b=e.target.closest('button[data-pairing-action]');if(!b)return;
