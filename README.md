@@ -6,11 +6,12 @@ A standalone, optional Docker service for human-facing operations visibility and
 
 - Live library inventory and total bytes.
 - Analysis queue counters: queued, leased, completed, and dead-lettered jobs.
-- Worker cards with CPU/GPU type, lifecycle state (`STARTING`, `READY`, `OFFLINE`), capabilities, model, capacity, active jobs, and heartbeat status.
+- Worker cards with CPU/GPU type, lifecycle state (`STARTING`, `READY`, `PAUSED`, `OFFLINE`), capabilities, model, capacity, active jobs, and heartbeat status.
 - Latest 20 jobs with path, status, worker, attempts, timestamps, and visible failure reason.
 - Latest library scan and Search ingestion/deletion outbox counters.
 - Search test form via Gateway and playback via short-lived stream tickets.
 - Dashboard refreshes every four seconds.
+- Host load protection status, host RAM/CPU/PSI metrics, pause reason, last sample/error, and remaining penalty time. Missing metrics are shown as an explicit warning.
 - Read-only: no job mutation, worker shutdown, or reindex controls.
 
 ## Architecture and security
