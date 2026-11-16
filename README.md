@@ -11,7 +11,7 @@ A standalone, optional Docker service for human-facing operations visibility and
 - Latest library scan and Search ingestion/deletion outbox counters.
 - Search test form via Gateway and playback via short-lived stream tickets.
 - Dashboard refreshes every four seconds.
-- Host load protection status, host RAM/CPU/PSI metrics, pause reason, last sample/error, and remaining penalty time. Missing metrics are shown as an explicit warning.
+- Worker lifecycle status, including the CPU worker fixed cooldown between batches.
 - Read-only: no job mutation, worker shutdown, or reindex controls.
 
 ## Architecture and security
