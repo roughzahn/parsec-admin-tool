@@ -40,18 +40,29 @@ function renderPairing(items){
  if(!items.length){host.innerHTML='<div class="empty">Keine offenen GPU-Anfragen.</div>';return;}
  host.innerHTML=items.map(w=>'<article class="pairing-request"><div class="pairing-info"><b>'+esc(w.workerId)+'</b><span class="type gpu">GPU · wartet auf Freigabe</span><small>Hostname (vom Worker gemeldet): '+esc(w.hostname)+'</small><small>Version: '+esc(w.workerVersion||'—')+' · Modell: '+esc(w.modelId)+'</small><small>Capabilities: '+esc((w.capabilities||[]).join(', ')||'—')+'</small><small>Angefragt: '+date(w.createdAt)+' · Ablauf: '+date(w.expiresAt)+'</small></div><div class="pairing-actions"><button data-pairing-action="approve" data-registration="'+esc(w.registrationId)+'">Freigeben</button><button class="reject" data-pairing-action="reject" data-registration="'+esc(w.registrationId)+'">Ablehnen</button></div></article>').join('');
 }
+function renderVersions(data){
+ const projects=data.projects||[];
+ $('versionsChecked').textContent='Geprüft '+date(data.checkedAt);
+ $('projectVersions').innerHTML=projects.map(p=>{
+  const installed=Array.isArray(p.installed)?p.installed.map(w=>esc(w.workerType||'Worker')+' '+esc(w.version)+' ('+esc(w.status||'unbekannt')+')').join('<br>'):p.installed?esc(p.installed):'Nicht ermittelbar';
+  const release=p.latestReleased?'<a href="'+esc(p.releaseUrl||'#')+'" target="_blank" rel="noopener noreferrer">'+esc(p.latestReleased)+'</a>':'Nicht verfügbar';
+  const status=p.upToDate===true?'<span class="version-ok">Aktuell</span>':p.upToDate===false?'<span class="version-old">Abweichend</span>':'<span class="version-unknown">Unbekannt</span>';
+  const note=p.releaseError?' · '+esc(p.releaseError):'';
+  return '<tr><td><b>'+esc(p.name)+'</b><small class="version-repo">'+esc(p.repository)+'</small></td><td>'+installed+'</td><td>'+release+note+(p.releaseStale?' · Cache':'')+'</td><td>'+status+'</td></tr>';
+ }).join('')||'<tr><td colspan="4">Keine Projekte konfiguriert.</td></tr>';
+}
 let refreshInFlight=false;
 async function refresh(){
  if(refreshInFlight)return;
  refreshInFlight=true;
  try{
-  const [o,h,p,a]=await Promise.all([
+  const [o,h,p,a,v]=await Promise.all([
    fetch('api/overview').then(r=>{if(r.status===401){showLogin();throw Error('Anmeldung erforderlich');}if(!r.ok)throw Error('Gateway '+r.status);return r.json()}),
    fetch('api/health').then(r=>r.json()),
    fetch('api/gpu-worker-registrations').then(r=>r.ok?r.json():[]),
-   fetch('api/active-streams').then(r=>{if(!r.ok)throw Error('Aktive Streams '+r.status);return r.json()})
+   fetch('api/active-streams').then(r=>{if(!r.ok)throw Error('Aktive Streams '+r.status);return r.json()}),\n   fetch('api/versions').then(r=>{if(!r.ok)throw Error('Versionen '+r.status);return r.json()})
   ]);
-  render(o);renderPairing(Array.isArray(p)?p:[]);renderActiveStreams(Array.isArray(a)?a:[]);
+  render(o);renderVersions(v);renderPairing(Array.isArray(p)?p:[]);renderActiveStreams(Array.isArray(a)?a:[]);
   const ok=h.gateway?.reachable&&h.search?.reachable;
   $('systemDot').style.background=ok?'var(--green)':'var(--red)';
   $('systemStatus').textContent=ok?'Gateway & Search bereit':'Service pr\u00fcfen';
