@@ -32,3 +32,6 @@
 .worker-status.paused{color:var(--yellow)}.worker-cooldown{display:grid;gap:3px;margin-top:10px;padding:10px 12px;border:1px solid rgba(242,198,109,.28);border-radius:9px;background:rgba(242,198,109,.07);color:var(--muted);font-size:12px}.worker-cooldown b{color:var(--yellow);font-variant-numeric:tabular-nums}.worker-activity{margin-top:8px;color:var(--muted);font-size:12px}
 
 .versions-table{min-width:720px}.versions-table td{vertical-align:top}.version-repo{display:block;color:var(--muted);font-size:11px;margin-top:3px}.version-ok{color:var(--green);font-weight:700}.version-old{color:var(--yellow);font-weight:700}.version-unknown{color:var(--muted);font-weight:700}.versions-table a{color:var(--accent);text-decoration:none}.versions-table a:hover{text-decoration:underline}
+
+.failed-dialog-actions{display:flex;align-items:center;gap:9px;flex-shrink:0}.failed-dialog-actions button{padding:9px 13px}.failed-dialog-actions #closeFailedJobs{background:#34435d}.failed-select{width:42px;text-align:center}.failed-select input,.failed-jobs-table thead input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}.failed-jobs-table{min-width:900px}
+@media(max-width:600px){.failed-dialog-actions{align-self:stretch;justify-content:flex-end;flex-wrap:wrap}}

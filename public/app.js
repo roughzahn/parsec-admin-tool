@@ -5,27 +5,71 @@ $('workerCount').textContent=n(d.workers?.length)+' Worker';$('workers').innerHT
 const i=d.ingestionOutbox||{},x=d.deletionOutbox||{};$('ingestionPending').textContent=n(i.pending)+' offen';$('ingestionMeta').textContent=n(i.delivered)+' zugestellt · '+n(i.dead)+' endgültige Fehler';$('deletionPending').textContent=n(x.pending)+' offen';$('deletionMeta').textContent=n(x.delivered)+' zugestellt · '+n(x.dead)+' endgültige Fehler';
 const jobs=d.recentJobs||[];$('jobCount').textContent=jobs.length+' zuletzt';$('jobs').innerHTML=jobs.map(x=>'<tr><td title="'+esc(x.path)+'">'+esc(x.path)+'</td><td><span class="state '+String(x.status).toLowerCase()+'">'+esc(x.status)+'</span></td><td>'+esc(x.workerId||'—')+'</td><td>'+n(x.attempt)+' / '+n(x.maxAttempts)+'</td><td>'+date(x.updatedAt)+'</td><td class="error-cell" title="'+esc(x.lastError||'')+'">'+esc(x.lastError||'—')+'</td></tr>').join('')||'<tr><td colspan="6">Noch keine Jobs vorhanden.</td></tr>';
 $('updated').textContent='Aktualisiert '+date(d.generatedAt);const s=d.latestScan;$('scanInfo').textContent=s?'Letzter Scan: '+s.status+' · '+n(s.filesSeen)+' Dateien · '+date(s.completedAt||s.startedAt):'Noch kein Bibliotheks-Scan';}
-async function openFailedJobs(){
- const dialog=$('failedJobsDialog'),rows=$('failedJobsRows'),count=$('failedJobsCount');
- rows.innerHTML='<tr><td colspan="5">Lade fehlgeschlagene Jobs …</td></tr>';
- count.textContent='Lade vollständige Fehlerliste …';
- dialog.showModal();
+function selectedFailedJobIds(){
+ return [...document.querySelectorAll('.failed-job-checkbox:checked')].map(input=>input.dataset.jobId);
+}
+function updateRescanButton(){
+ const selected=selectedFailedJobIds(),button=$('rescanFailedJobs');
+ button.disabled=selected.length===0;
+ button.textContent=selected.length?'Re-Scan ('+selected.length+')':'Re-Scan';
+ const all=document.querySelectorAll('.failed-job-checkbox'),selectAll=$('selectAllFailedJobs');
+ selectAll.checked=all.length>0&&selected.length===all.length;
+ selectAll.indeterminate=selected.length>0&&selected.length<all.length;
+}
+async function loadFailedJobs(){
+ const rows=$('failedJobsRows'),count=$('failedJobsCount'),button=$('rescanFailedJobs');
+ rows.innerHTML='<tr><td colspan="6">Lade fehlgeschlagene Jobs ...</td></tr>';
+ button.disabled=true;
  try{
   const response=await fetch('api/failed-jobs');
   const data=await response.json().catch(()=>[]);
   if(!response.ok)throw Error(data.error||'HTTP '+response.status);
   const jobs=Array.isArray(data)?data:[];
-  count.textContent=jobs.length+' betroffene Musikdatei'+(jobs.length===1?'':'en')+' · alle dauerhaft fehlgeschlagenen Jobs';
-  rows.innerHTML=jobs.map(job=>'<tr><td class="failed-path">'+esc(job.path)+'</td><td class="failed-error">'+esc(job.lastError||'Keine Fehlerbeschreibung gespeichert')+'</td><td>'+n(job.attempt)+' / '+n(job.maxAttempts)+'</td><td>'+date(job.createdAt)+'</td><td>'+date(job.updatedAt)+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">Aktuell gibt es keine dauerhaft fehlgeschlagenen Musikdateien.</td></tr>';
+  count.textContent=jobs.length+' betroffene Musikdatei'+(jobs.length===1?'':'en')+' - alle dauerhaft fehlgeschlagenen Jobs';
+  rows.innerHTML=jobs.map(job=>'<tr><td class="failed-select"><input class="failed-job-checkbox" type="checkbox" data-job-id="'+esc(job.jobId)+'" aria-label="Musikdatei zum Re-Scan markieren"></td><td class="failed-path">'+esc(job.path)+'</td><td class="failed-error">'+esc(job.lastError||'Keine Fehlerbeschreibung gespeichert')+'</td><td>'+n(job.attempt)+' / '+n(job.maxAttempts)+'</td><td>'+date(job.createdAt)+'</td><td>'+date(job.updatedAt)+'</td></tr>').join('')||'<tr><td colspan="6" class="empty">Aktuell gibt es keine dauerhaft fehlgeschlagenen Musikdateien.</td></tr>';
+  updateRescanButton();
  }catch(error){
   count.textContent='Fehler beim Laden der Details';
-  rows.innerHTML='<tr><td colspan="5" class="failed-error">'+esc(error.message)+'</td></tr>';
+  rows.innerHTML='<tr><td colspan="6" class="failed-error">'+esc(error.message)+'</td></tr>';
+ }
+}
+async function openFailedJobs(){
+ $('failedJobsDialog').showModal();
+ await loadFailedJobs();
+}
+async function rescanSelectedFailedJobs(){
+ const jobIds=selectedFailedJobIds();
+ if(!jobIds.length)return;
+ if(!confirm(jobIds.length+' ausgew\u00e4hlte Musikdatei'+(jobIds.length===1?'':'en')+' erneut analysieren lassen?'))return;
+ const button=$('rescanFailedJobs');
+ button.disabled=true;
+ button.textContent='Re-Scan wird gestartet ...';
+ try{
+  let requeued=0;
+  for(let offset=0;offset<jobIds.length;offset+=500){
+   const response=await fetch('api/failed-jobs/requeue',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jobIds:jobIds.slice(offset,offset+500)})});
+   const result=await response.json().catch(()=>({}));
+   if(!response.ok)throw Error(result.error||'HTTP '+response.status);
+   requeued+=Number(result.requeued||0);
+   button.textContent='Re-Scan '+Math.min(offset+500,jobIds.length)+' / '+jobIds.length;
+  }
+  await loadFailedJobs();
+  await refresh();
+  alert(requeued+' Job(s) wurden erneut in die Warteschlange gestellt.');
+ }catch(error){
+  alert('Re-Scan konnte nicht gestartet werden: '+error.message);
+  updateRescanButton();
  }
 }
 $('failedJobsButton').addEventListener('click',openFailedJobs);
 $('closeFailedJobs').addEventListener('click',()=>$('failedJobsDialog').close());
+$('rescanFailedJobs').addEventListener('click',rescanSelectedFailedJobs);
+$('failedJobsRows').addEventListener('change',event=>{if(event.target.matches('.failed-job-checkbox'))updateRescanButton();});
+$('selectAllFailedJobs').addEventListener('change',event=>{
+ document.querySelectorAll('.failed-job-checkbox').forEach(input=>input.checked=event.target.checked);
+ updateRescanButton();
+});
 $('failedJobsDialog').addEventListener('click',event=>{if(event.target===$('failedJobsDialog'))$('failedJobsDialog').close();});
-
 function formatDuration(seconds){const value=Math.max(0,Math.floor(seconds)),minutes=Math.floor(value/60),rest=value%60;return minutes+'m '+String(rest).padStart(2,'0')+'s';}
 
 function updateCooldownCountdowns(){const now=Date.now();document.querySelectorAll('.cooldown-countdown').forEach(el=>{const started=Date.parse(el.dataset.startedAt),until=Date.parse(el.dataset.until);if(!Number.isFinite(started)||!Number.isFinite(until)){el.textContent='Cooldown-Zeit nicht verf\u00fcgbar';return;}const elapsed=Math.max(0,Math.floor((now-started)/1000)),remaining=Math.max(0,Math.ceil((until-now)/1000));el.textContent=remaining>0?'Pausiert seit '+formatDuration(elapsed)+' \u00b7 N\u00e4chster Batch in '+formatDuration(remaining):'Pausiert seit '+formatDuration(elapsed)+' \u00b7 Cooldown abgelaufen, Statusupdate ausstehend';});}
