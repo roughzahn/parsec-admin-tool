@@ -11,7 +11,7 @@ A standalone, optional Docker service for human-facing operations visibility and
 - Latest library scan and Search ingestion/deletion outbox counters.
 - Search test form via Gateway and playback via short-lived stream tickets.
 - Dashboard refreshes every four seconds.
-- Worker lifecycle status, including the CPU worker fixed cooldown between batches.
+- Worker lifecycle status, including CPU batch cooldown start time and exact next-batch countdown from Gateway-reported timestamps.
 - Read-only: no job mutation, worker shutdown, or reindex controls.
 
 ## Architecture and security
@@ -49,7 +49,7 @@ The local token is stored in the ignored E2E `.env` file. Do not copy it into so
 
 ## Backend API
 
-- `GET /api/overview` - authenticated Gateway overview, proxied server-side.
+- `GET /api/overview` - authenticated Gateway overview, proxied server-side; worker cards include `pauseStartedAt` and `cooldownUntil` during CPU cooldown.
 - `GET /api/health` - sanitized Gateway readiness and Search health.
 - `POST /api/search` - Gateway search proxy.
 - `POST /api/tracks/:trackId/stream-ticket` - Gateway short-lived stream ticket.
