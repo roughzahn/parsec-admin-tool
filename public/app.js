@@ -5,6 +5,10 @@ $('workerCount').textContent=n(d.workers?.length)+' Worker';$('workers').innerHT
 const i=d.ingestionOutbox||{},x=d.deletionOutbox||{};$('ingestionPending').textContent=n(i.pending)+' offen';$('ingestionMeta').textContent=n(i.delivered)+' zugestellt · '+n(i.dead)+' endgültige Fehler';$('deletionPending').textContent=n(x.pending)+' offen';$('deletionMeta').textContent=n(x.delivered)+' zugestellt · '+n(x.dead)+' endgültige Fehler';
 const jobs=d.recentJobs||[];$('jobCount').textContent=jobs.length+' zuletzt';$('jobs').innerHTML=jobs.map(x=>'<tr><td title="'+esc(x.path)+'">'+esc(x.path)+'</td><td><span class="state '+String(x.status).toLowerCase()+'">'+esc(x.status)+'</span></td><td>'+esc(x.workerId||'—')+'</td><td>'+n(x.attempt)+' / '+n(x.maxAttempts)+'</td><td>'+date(x.updatedAt)+'</td><td class="error-cell" title="'+esc(x.lastError||'')+'">'+esc(x.lastError||'—')+'</td></tr>').join('')||'<tr><td colspan="6">Noch keine Jobs vorhanden.</td></tr>';
 $('updated').textContent='Aktualisiert '+date(d.generatedAt);const s=d.latestScan;$('scanInfo').textContent=s?'Letzter Scan: '+s.status+' · '+n(s.filesSeen)+' Dateien · '+date(s.completedAt||s.startedAt):'Noch kein Bibliotheks-Scan';}
+function formatDuration(seconds){const value=Math.max(0,Math.floor(seconds)),minutes=Math.floor(value/60),rest=value%60;return minutes+'m '+String(rest).padStart(2,'0')+'s';}
+function renderActiveStreams(items){$('activeStreamCount').textContent=items.length+' Streams';$('activeStreams').innerHTML=items.map(s=>'<tr><td>'+esc(s.host||'unbekannt')+'</td><td>'+esc(s.title||'Unbekannter Titel')+'</td><td>'+date(s.startedAt)+'</td><td class="stream-duration" data-started-at="'+esc(s.startedAt)+'">—</td></tr>').join('')||'<tr><td colspan="4" class="empty">Aktuell werden keine Audiodaten übertragen.</td></tr>';updateActiveStreamDurations();}
+function updateActiveStreamDurations(){const now=Date.now();document.querySelectorAll('.stream-duration').forEach(el=>{const started=Date.parse(el.dataset.startedAt);el.textContent=Number.isFinite(started)?formatDuration((now-started)/1000):'—';});}
+setInterval(updateActiveStreamDurations,1000);
 function renderPairing(items){
  const host=$('gpuPairing');
  if(!items.length){host.innerHTML='<div class="empty">Keine offenen GPU-Anfragen.</div>';return;}
@@ -15,12 +19,13 @@ async function refresh(){
  if(refreshInFlight)return;
  refreshInFlight=true;
  try{
-  const [o,h,p]=await Promise.all([
+  const [o,h,p,a]=await Promise.all([
    fetch('api/overview').then(r=>{if(r.status===401){showLogin();throw Error('Anmeldung erforderlich');}if(!r.ok)throw Error('Gateway '+r.status);return r.json()}),
    fetch('api/health').then(r=>r.json()),
-   fetch('api/gpu-worker-registrations').then(r=>r.ok?r.json():[])
+   fetch('api/gpu-worker-registrations').then(r=>r.ok?r.json():[]),
+   fetch('api/active-streams').then(r=>{if(!r.ok)throw Error('Aktive Streams '+r.status);return r.json()})
   ]);
-  render(o);renderPairing(Array.isArray(p)?p:[]);
+  render(o);renderPairing(Array.isArray(p)?p:[]);renderActiveStreams(Array.isArray(a)?a:[]);
   const ok=h.gateway?.reachable&&h.search?.reachable;
   $('systemDot').style.background=ok?'var(--green)':'var(--red)';
   $('systemStatus').textContent=ok?'Gateway & Search bereit':'Service pr\u00fcfen';
