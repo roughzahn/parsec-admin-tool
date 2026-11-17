@@ -18,7 +18,9 @@ const sessions = new Map();
 const loginFailures = new Map();
 const versionProjects = [
  {id:'gateway',name:'Media Gateway',repository:'roughzahn/parsec-media-gateway'},
+ {id:'search',name:'Search',repository:'roughzahn/parsec-search'},
  {id:'worker',name:'Music Worker',repository:'roughzahn/parsec-music-worker'},
+ {id:'audio-node',name:'Audio Node',repository:'roughzahn/audio-node-for-parsec'},
  {id:'admin',name:'Admin Tool',repository:'roughzahn/parsec-admin-tool'}
 ];
 const releaseCache = new Map();
@@ -42,6 +44,7 @@ async function latestRelease(project) {
 }
 function installedVersion(project,overview,info) {
  if(project.id==='admin')return process.env.PARSEC_ADMIN_VERSION||'dev';
+ if(project.id==='search'||project.id==='audio-node')return null;
  if(project.id==='gateway') {
   const build=info?.build||{};
   return build.version||build.artifact||process.env.PARSEC_GATEWAY_VERSION||null;
