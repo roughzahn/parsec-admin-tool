@@ -16,6 +16,62 @@ const forceSecureCookies = process.env.PARSEC_ADMIN_COOKIE_SECURE === 'true';
 const sessionLifetimeMs = 12 * 60 * 60 * 1000;
 const sessions = new Map();
 const loginFailures = new Map();
+const versionProjects = [
+ {id:'gateway',name:'Media Gateway',repository:'roughzahn/parsec-media-gateway'},
+ {id:'search',name:'Search',repository:'roughzahn/parsec-search'},
+ {id:'worker',name:'Music Worker',repository:'roughzahn/parsec-music-worker'},
+ {id:'audio-node',name:'Audio Node',repository:'roughzahn/audio-node-for-parsec'},
+ {id:'admin',name:'Admin Tool',repository:'roughzahn/parsec-admin-tool'}
+];
+const releaseCache = new Map();
+const RELEASE_CACHE_MS = 15 * 60 * 1000;
+async function latestRelease(project) {
+ const cached=releaseCache.get(project.id);
+ if(cached&&cached.expiresAt>Date.now())return cached.value;
+ try {
+  const response=await get(`https://api.github.com/repos/${project.repository}/releases/latest`,{
+   headers:{accept:'application/vnd.github+json','user-agent':'parsec-admin-tool'}
+  });
+  if(!response.ok)throw Error('GitHub HTTP '+response.status);
+  const release=await response.json();
+  const value={version:String(release.tag_name||'').replace(/^v/i,''),url:release.html_url||null,publishedAt:release.published_at||null};
+  releaseCache.set(project.id,{value,expiresAt:Date.now()+RELEASE_CACHE_MS});
+  return value;
+ } catch(error) {
+  if(cached)return {...cached.value,stale:true};
+  return {version:null,url:null,error:'Release derzeit nicht abrufbar'};
+ }
+}
+function installedVersion(project,overview,info) {
+ if(project.id==='admin')return process.env.PARSEC_ADMIN_VERSION||'dev';
+ if(project.id==='search'||project.id==='audio-node')return null;
+ if(project.id==='gateway') {
+  const build=info?.build||{};
+  return build.version||build.artifact||process.env.PARSEC_GATEWAY_VERSION||null;
+ }
+ const workers=(overview?.workers||[]).filter(w=>w.workerVersion);
+ if(!workers.length)return null;
+ return workers.map(w=>({workerId:w.workerId,workerType:w.workerType,version:w.workerVersion,status:w.status||(w.online?'READY':'OFFLINE')}))
+  .sort((a,b)=>String(a.workerType).localeCompare(String(b.workerType)));
+}
+async function versionOverview() {
+ const [releases,overviewResult,infoResult]=await Promise.all([
+  Promise.all(versionProjects.map(latestRelease)),
+  token?get(`${gateway}/internal/v1/admin/overview`,{headers:{authorization:`Bearer ${token}`}}).then(async r=>r.ok?r.json():null).catch(()=>null):Promise.resolve(null),
+  get(`${gateway}/actuator/info`).then(async r=>r.ok?r.json():null).catch(()=>null)
+ ]);
+ return {
+  checkedAt:new Date().toISOString(),
+  projects:versionProjects.map((project,index)=>{
+   const installed=installedVersion(project,overviewResult,infoResult);
+   const latest=releases[index];
+   const installedVersions=Array.isArray(installed)?installed.map(w=>w.version):installed?[installed]:[];
+   const upToDate=latest.version&&installedVersions.length?installedVersions.every(v=>v===latest.version):null;
+   return {id:project.id,name:project.name,repository:project.repository,latestReleased:latest.version,releaseUrl:latest.url,publishedAt:latest.publishedAt,releaseError:latest.error||null,releaseStale:!!latest.stale,installed,upToDate};
+  })
+ };
+}
+
 const json = (res, status, body, headers={}) => { res.writeHead(status, {'content-type':'application/json; charset=utf-8','cache-control':'no-store',...headers}); res.end(JSON.stringify(body)); };
 async function readBody(req) { let raw=''; for await (const c of req) { raw+=c; if(raw.length>32768) throw Error('Request too large'); } return raw?JSON.parse(raw):{}; }
 const get = (url, options={}) => fetch(url,{...options,signal:AbortSignal.timeout(15000)});
@@ -76,6 +132,7 @@ async function handle(req,res) {
   const parse=async x=>x.status==='fulfilled'?{reachable:x.value.ok,status:x.value.status,details:await x.value.json().catch(()=>({}))}:{reachable:false,error:'unreachable'};
   return json(res,200,{gateway:await parse(checks[0]),search:await parse(checks[1]),checkedAt:new Date().toISOString()});
  }
+ if(req.method==='GET'&&url.pathname==='/api/versions') return json(res,200,await versionOverview());
  if(req.method==='GET'&&url.pathname==='/api/overview') {
   if(!token)return json(res,503,{error:'Admin credential is not configured'});
   const r=await get(`${gateway}/internal/v1/admin/overview`,{headers:{authorization:`Bearer ${token}`}});

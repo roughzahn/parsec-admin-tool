@@ -1,5 +1,6 @@
 FROM node:24-alpine
-ENV NODE_ENV=production PARSEC_ADMIN_PORT=3000 TZ=Europe/Berlin
+ARG PARSEC_ADMIN_VERSION=dev
+ENV NODE_ENV=production PARSEC_ADMIN_PORT=3000 TZ=Europe/Berlin PARSEC_ADMIN_VERSION=$PARSEC_ADMIN_VERSION
 WORKDIR /app
 COPY server.mjs /app/server.mjs
 COPY public /app/public
