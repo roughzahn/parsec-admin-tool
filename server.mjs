@@ -24,7 +24,7 @@ const versionProjects = [
  {id:'admin',name:'Admin Tool',repository:'roughzahn/parsec-admin-tool'}
 ];
 const releaseCache = new Map();
-const RELEASE_CACHE_MS = 5 * 60 * 1000;
+const RELEASE_CACHE_MS = 15 * 60 * 1000;
 async function latestRelease(project) {
  const cached=releaseCache.get(project.id);
  if(cached&&cached.expiresAt>Date.now())return cached.value;
