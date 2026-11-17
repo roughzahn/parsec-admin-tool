@@ -81,6 +81,11 @@ async function handle(req,res) {
   const r=await get(`${gateway}/internal/v1/admin/overview`,{headers:{authorization:`Bearer ${token}`}});
   return json(res,r.status,await r.json().catch(()=>({error:'Invalid Gateway response'})));
  }
+ if(req.method==='GET'&&url.pathname==='/api/active-streams') {
+  if(!token)return json(res,503,{error:'Admin credential is not configured'});
+  const r=await get(`${gateway}/internal/v1/admin/active-streams`,{headers:{authorization:`Bearer ${token}`}});
+  return json(res,r.status,await r.json().catch(()=>({error:'Invalid Gateway response'})));
+ }
  if(req.method==='GET'&&url.pathname==='/api/gpu-worker-registrations') {
   if(!token)return json(res,503,{error:'Admin credential is not configured'});
   const r=await get(`${gateway}/internal/v1/admin/gpu-worker-registrations`,{headers:{authorization:`Bearer ${token}`}});
@@ -115,6 +120,8 @@ async function handle(req,res) {
   const headers={}; if(req.headers.range)headers.range=req.headers.range;
   // Do not apply the short API timeout to audio: a full song may stream for several minutes.
   const controller=new AbortController();
+  const clientIp=String(req.headers['x-real-ip']||req.socket.remoteAddress||'unbekannt').split(',')[0].trim().slice(0,64);
+  headers['x-parsec-client-ip']=clientIp;
   const r=await fetch(`${gateway}/api/v1/stream/${encodeURIComponent(stream[1])}`,{headers,signal:controller.signal});
   const out={}; for(const k of ['content-type','content-length','content-range','accept-ranges']){const v=r.headers.get(k);if(v)out[k]=v;}
   res.writeHead(r.status,out);
