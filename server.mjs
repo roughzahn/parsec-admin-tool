@@ -81,6 +81,11 @@ async function handle(req,res) {
   const r=await get(`${gateway}/internal/v1/admin/overview`,{headers:{authorization:`Bearer ${token}`}});
   return json(res,r.status,await r.json().catch(()=>({error:'Invalid Gateway response'})));
  }
+ if(req.method==='GET'&&url.pathname==='/api/failed-jobs') {
+  if(!token)return json(res,503,{error:'Admin credential is not configured'});
+  const r=await get(`${gateway}/internal/v1/admin/failed-jobs`,{headers:{authorization:`Bearer ${token}`}});
+  return json(res,r.status,await r.json().catch(()=>({error:'Invalid Gateway response'})));
+ }
  if(req.method==='GET'&&url.pathname==='/api/active-streams') {
   if(!token)return json(res,503,{error:'Admin credential is not configured'});
   const r=await get(`${gateway}/internal/v1/admin/active-streams`,{headers:{authorization:`Bearer ${token}`}});
