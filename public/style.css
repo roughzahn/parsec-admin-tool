@@ -36,3 +36,13 @@
 .failed-dialog-actions{display:flex;align-items:center;gap:9px;flex-shrink:0}.failed-dialog-actions button{padding:9px 13px}.failed-dialog-actions #closeFailedJobs{background:#34435d}.failed-select{width:42px;text-align:center}.failed-select input,.failed-jobs-table thead input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}.failed-jobs-table{min-width:900px}
 @media(max-width:600px){.failed-dialog-actions{align-self:stretch;justify-content:flex-end;flex-wrap:wrap}}
 .versions-panel{padding:0;overflow:hidden}.versions-panel>summary{list-style:none;cursor:pointer;padding:20px 21px;margin:0}.versions-panel>summary::-webkit-details-marker{display:none}.versions-panel>summary::after{content:'+';color:var(--accent);font-size:22px;line-height:1;flex-shrink:0}.versions-panel[open]>summary::after{content:'−'}.versions-panel[open]>summary{border-bottom:1px solid var(--line)}.versions-panel .table-wrap{padding:0 21px 21px}.versions-panel>summary:focus-visible{outline:2px solid var(--accent);outline-offset:-4px;border-radius:15px}
+
+.load-protection{border-left:4px solid var(--yellow);border-color:var(--yellow);box-shadow:0 0 18px rgba(242,198,109,.07)}
+.load-protection.warning{border-left-color:var(--yellow)}
+.load-protection.critical,.load-protection.unavailable{border-left-color:var(--red);border-color:rgba(255,125,134,.65)}
+.load-protection[hidden]{display:none}
+.load-message{margin:0 0 12px;color:var(--text)}
+.load-error{margin:8px 0;padding:10px 12px;border:1px solid #743b45;border-radius:8px;background:#351d29;color:#ffb4bb;font-size:12px;overflow-wrap:anywhere}
+.load-metrics{display:flex;flex-wrap:wrap;gap:10px 22px;color:var(--muted);font-size:12px}
+.load-metrics b{color:var(--text);font-variant-numeric:tabular-nums}
+.load-timing{display:block;margin-top:12px;color:var(--muted);font-size:11px}
