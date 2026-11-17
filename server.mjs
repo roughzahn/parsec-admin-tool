@@ -42,9 +42,10 @@ async function latestRelease(project) {
   return {version:null,url:null,error:'Release derzeit nicht abrufbar'};
  }
 }
-function installedVersion(project,overview,info) {
+function installedVersion(project,overview,info,searchInfo) {
  if(project.id==='admin')return process.env.PARSEC_ADMIN_VERSION||'dev';
- if(project.id==='search'||project.id==='audio-node')return null;
+ if(project.id==='search')return searchInfo?.softwareVersion||null;
+ if(project.id==='audio-node')return overview?.audioNodeVersion||null;
  if(project.id==='gateway') {
   const build=info?.build||{};
   return build.version||build.artifact||process.env.PARSEC_GATEWAY_VERSION||null;
@@ -55,15 +56,16 @@ function installedVersion(project,overview,info) {
   .sort((a,b)=>String(a.workerType).localeCompare(String(b.workerType)));
 }
 async function versionOverview() {
- const [releases,overviewResult,infoResult]=await Promise.all([
+ const [releases,overviewResult,infoResult,searchResult]=await Promise.all([
   Promise.all(versionProjects.map(latestRelease)),
   token?get(`${gateway}/internal/v1/admin/overview`,{headers:{authorization:`Bearer ${token}`}}).then(async r=>r.ok?r.json():null).catch(()=>null):Promise.resolve(null),
-  get(`${gateway}/actuator/info`).then(async r=>r.ok?r.json():null).catch(()=>null)
+  get(`${gateway}/actuator/info`).then(async r=>r.ok?r.json():null).catch(()=>null),
+  get(`${search}/health`).then(async r=>r.ok?r.json():null).catch(()=>null)
  ]);
  return {
   checkedAt:new Date().toISOString(),
   projects:versionProjects.map((project,index)=>{
-   const installed=installedVersion(project,overviewResult,infoResult);
+   const installed=installedVersion(project,overviewResult,infoResult,searchResult);
    const latest=releases[index];
    const installedVersions=Array.isArray(installed)?installed.map(w=>w.version):installed?[installed]:[];
    const upToDate=latest.version&&installedVersions.length?installedVersions.every(v=>v===latest.version):null;
