@@ -51,6 +51,7 @@ The local token is stored in the ignored E2E `.env` file. Do not copy it into so
 
 - `GET /api/overview` - authenticated Gateway overview, proxied server-side; worker cards include `pauseStartedAt` and `cooldownUntil` during CPU cooldown.
 - `GET /api/active-streams` - currently active audio transfers with client IP, track title, and start time; refreshed with the dashboard every four seconds. This indicates active HTTP transfer, not confirmed playback state on the receiving device.
+- `GET /api/failed-jobs` - all permanently failed analysis jobs, including the full library-relative audio path, attempt count, timestamps, and last error. Opened from the clickable failed-jobs metric.
 - `GET /api/health` - sanitized Gateway readiness and Search health.
 - `POST /api/search` - Gateway search proxy.
 - `POST /api/tracks/:trackId/stream-ticket` - Gateway short-lived stream ticket.

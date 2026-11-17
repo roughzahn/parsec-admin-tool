@@ -5,6 +5,27 @@ $('workerCount').textContent=n(d.workers?.length)+' Worker';$('workers').innerHT
 const i=d.ingestionOutbox||{},x=d.deletionOutbox||{};$('ingestionPending').textContent=n(i.pending)+' offen';$('ingestionMeta').textContent=n(i.delivered)+' zugestellt · '+n(i.dead)+' endgültige Fehler';$('deletionPending').textContent=n(x.pending)+' offen';$('deletionMeta').textContent=n(x.delivered)+' zugestellt · '+n(x.dead)+' endgültige Fehler';
 const jobs=d.recentJobs||[];$('jobCount').textContent=jobs.length+' zuletzt';$('jobs').innerHTML=jobs.map(x=>'<tr><td title="'+esc(x.path)+'">'+esc(x.path)+'</td><td><span class="state '+String(x.status).toLowerCase()+'">'+esc(x.status)+'</span></td><td>'+esc(x.workerId||'—')+'</td><td>'+n(x.attempt)+' / '+n(x.maxAttempts)+'</td><td>'+date(x.updatedAt)+'</td><td class="error-cell" title="'+esc(x.lastError||'')+'">'+esc(x.lastError||'—')+'</td></tr>').join('')||'<tr><td colspan="6">Noch keine Jobs vorhanden.</td></tr>';
 $('updated').textContent='Aktualisiert '+date(d.generatedAt);const s=d.latestScan;$('scanInfo').textContent=s?'Letzter Scan: '+s.status+' · '+n(s.filesSeen)+' Dateien · '+date(s.completedAt||s.startedAt):'Noch kein Bibliotheks-Scan';}
+async function openFailedJobs(){
+ const dialog=$('failedJobsDialog'),rows=$('failedJobsRows'),count=$('failedJobsCount');
+ rows.innerHTML='<tr><td colspan="5">Lade fehlgeschlagene Jobs …</td></tr>';
+ count.textContent='Lade vollständige Fehlerliste …';
+ dialog.showModal();
+ try{
+  const response=await fetch('api/failed-jobs');
+  const data=await response.json().catch(()=>[]);
+  if(!response.ok)throw Error(data.error||'HTTP '+response.status);
+  const jobs=Array.isArray(data)?data:[];
+  count.textContent=jobs.length+' betroffene Musikdatei'+(jobs.length===1?'':'en')+' · alle dauerhaft fehlgeschlagenen Jobs';
+  rows.innerHTML=jobs.map(job=>'<tr><td class="failed-path">'+esc(job.path)+'</td><td class="failed-error">'+esc(job.lastError||'Keine Fehlerbeschreibung gespeichert')+'</td><td>'+n(job.attempt)+' / '+n(job.maxAttempts)+'</td><td>'+date(job.createdAt)+'</td><td>'+date(job.updatedAt)+'</td></tr>').join('')||'<tr><td colspan="5" class="empty">Aktuell gibt es keine dauerhaft fehlgeschlagenen Musikdateien.</td></tr>';
+ }catch(error){
+  count.textContent='Fehler beim Laden der Details';
+  rows.innerHTML='<tr><td colspan="5" class="failed-error">'+esc(error.message)+'</td></tr>';
+ }
+}
+$('failedJobsButton').addEventListener('click',openFailedJobs);
+$('closeFailedJobs').addEventListener('click',()=>$('failedJobsDialog').close());
+$('failedJobsDialog').addEventListener('click',event=>{if(event.target===$('failedJobsDialog'))$('failedJobsDialog').close();});
+
 function formatDuration(seconds){const value=Math.max(0,Math.floor(seconds)),minutes=Math.floor(value/60),rest=value%60;return minutes+'m '+String(rest).padStart(2,'0')+'s';}
 
 function updateCooldownCountdowns(){const now=Date.now();document.querySelectorAll('.cooldown-countdown').forEach(el=>{const started=Date.parse(el.dataset.startedAt),until=Date.parse(el.dataset.until);if(!Number.isFinite(started)||!Number.isFinite(until)){el.textContent='Cooldown-Zeit nicht verf\u00fcgbar';return;}const elapsed=Math.max(0,Math.floor((now-started)/1000)),remaining=Math.max(0,Math.ceil((until-now)/1000));el.textContent=remaining>0?'Pausiert seit '+formatDuration(elapsed)+' \u00b7 N\u00e4chster Batch in '+formatDuration(remaining):'Pausiert seit '+formatDuration(elapsed)+' \u00b7 Cooldown abgelaufen, Statusupdate ausstehend';});}
