@@ -60,7 +60,8 @@ async function refresh(){
    fetch('api/overview').then(r=>{if(r.status===401){showLogin();throw Error('Anmeldung erforderlich');}if(!r.ok)throw Error('Gateway '+r.status);return r.json()}),
    fetch('api/health').then(r=>r.json()),
    fetch('api/gpu-worker-registrations').then(r=>r.ok?r.json():[]),
-   fetch('api/active-streams').then(r=>{if(!r.ok)throw Error('Aktive Streams '+r.status);return r.json()}),\n   fetch('api/versions').then(r=>{if(!r.ok)throw Error('Versionen '+r.status);return r.json()})
+   fetch('api/active-streams').then(r=>{if(!r.ok)throw Error('Aktive Streams '+r.status);return r.json()}),
+   fetch('api/versions').then(r=>{if(!r.ok)throw Error('Versionen '+r.status);return r.json()})
   ]);
   render(o);renderVersions(v);renderPairing(Array.isArray(p)?p:[]);renderActiveStreams(Array.isArray(a)?a:[]);
   const ok=h.gateway?.reachable&&h.search?.reachable;
