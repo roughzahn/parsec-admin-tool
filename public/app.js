@@ -1,4 +1,21 @@
 const $=id=>document.getElementById(id),n=v=>Number(v||0).toLocaleString('de-DE'),date=v=>v?new Date(v).toLocaleString('de-DE'):'—',esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function renderPerformanceMonitoring(p){
+ const panel=$('performancePanel'),status=p?.status||'METRICS_UNAVAILABLE',metrics=p?.metrics||{};
+ const labels={WARNING:'Erhöhte Last',CRITICAL:'Kritische Last',METRICS_UNAVAILABLE:'Metriken nicht verfügbar'};
+ const visible=['WARNING','CRITICAL','METRICS_UNAVAILABLE'].includes(status);
+ panel.hidden=!visible;
+ if(!visible)return;
+ panel.className='panel load-protection '+(status==='METRICS_UNAVAILABLE'?'unavailable':status==='CRITICAL'?'critical':'warning');
+ $('performanceStatus').textContent=labels[status]||status;
+ $('performanceMessage').textContent=p?.reason||'Der Gateway-Metrikstatus ist nicht verfügbar.';
+ const error=p?.lastError||'';
+ $('performanceError').hidden=!error;
+ $('performanceError').textContent=error?'Messfehler: '+error:'';
+ const mb=v=>v==null?'—':(Number(v)/1024/1024).toLocaleString('de-DE',{maximumFractionDigits:0})+' MiB';
+ const pct=v=>v==null?'—':Number(v).toLocaleString('de-DE',{maximumFractionDigits:1})+'%';
+ $('performanceMetrics').innerHTML='<span>RAM verfügbar: <b>'+mb(metrics.memoryAvailableBytes)+'</b> ('+pct(metrics.memoryAvailablePercent)+')</span><span>CPU-Auslastung: <b>'+pct(metrics.cpuUsagePercent)+'</b></span><span>Load Average (1 min): <b>'+(metrics.loadAverage1m==null?'—':Number(metrics.loadAverage1m).toLocaleString('de-DE',{maximumFractionDigits:2}))+'</b></span><span>Memory PSI: <b>'+pct(metrics.memoryPsiSomeAvg10)+'</b></span><span>CPU PSI: <b>'+pct(metrics.cpuPsiSomeAvg10)+'</b></span><span>I/O PSI: <b>'+pct(metrics.ioPsiFullAvg10)+'</b></span>';
+ $('performanceTiming').textContent='Letzte Messung: '+date(p?.lastSampleAt);
+}
 function render(d){const j=d.jobs||{},total=Object.values(j).reduce((a,b)=>a+Number(b||0),0),done=+j.completed||0,active=+j.leased||0,queued=+j.queued||0,dead=+j.dead||0,pct=total?Math.round(done/total*100):0;
 $('tracks').textContent=n(d.inventory?.totalTracks);$('leased').textContent=n(active);$('queued').textContent=n(queued);$('completed').textContent=n(done);$('progress').textContent='von '+n(total)+' Jobs';$('dead').textContent=n(dead);$('progressPct').textContent=pct+'%';$('progressBar').style.width=pct+'%';
 $('workerCount').textContent=n(d.workers?.length)+' Worker';$('workers').innerHTML=(d.workers||[]).map(w=>{const status=w.status||(w.online?'READY':'OFFLINE'),isCpu=w.workerType==='CPU',cooldown=isCpu&&status==='PAUSED',label={STARTING:'Startet',READY:'Bereit',IDLE:'Leerlauf - Modell entladen',OFFLINE:'Offline',PAUSED:'Cooldown'}[status]||status,activity=cooldown?(w.pauseStartedAt&&w.cooldownUntil?'<div class="worker-cooldown"><span>Pausiert seit '+date(w.pauseStartedAt)+'</span><b class="cooldown-countdown" data-started-at="'+esc(w.pauseStartedAt)+'" data-until="'+esc(w.cooldownUntil)+'"></b></div>':'<div class="worker-cooldown">Cooldown aktiv - Zeitangaben nicht verf\u00fcgbar</div>'):isCpu&&status==='READY'?'<div class="worker-activity">'+(Number(w.activeJobs)>0?'Arbeitet gerade':'Wartet auf Auftr\u00e4ge')+'</div>':'';return '<article class="worker"><div class="worker-top"><b>'+esc(w.workerId)+'</b><span class="type '+(w.workerType==='GPU'?'gpu':'')+'">'+esc(w.workerType)+'</span></div><div class="worker-meta"><span class="worker-status '+String(status).toLowerCase()+'">\u25cf '+esc(label)+'</span> - '+n(w.activeJobs)+' / '+n(w.maxConcurrentJobs)+' Jobs<br>Modell: '+esc(w.modelId)+'<br>Heartbeat: '+date(w.lastSeenAt)+'<br>Capabilities: '+esc((w.capabilities||[]).join(', ')||'-')+'</div>'+activity+(w.workerType==='GPU'?'<div class="worker-actions"><button class="reject" data-worker-action="revoke" data-worker-id="'+esc(w.workerId)+'">Session entziehen</button></div>':'')+'</article>';}).join('')||'Noch keine Worker registriert.';updateCooldownCountdowns();
@@ -107,7 +124,7 @@ async function refresh(){
    fetch('api/active-streams').then(r=>{if(!r.ok)throw Error('Aktive Streams '+r.status);return r.json()}),
    fetch('api/versions').then(r=>{if(!r.ok)throw Error('Versionen '+r.status);return r.json()})
   ]);
-  render(o);renderVersions(v);renderPairing(Array.isArray(p)?p:[]);renderActiveStreams(Array.isArray(a)?a:[]);
+  render(o);renderPerformanceMonitoring(o.performanceMonitoring);renderVersions(v);renderPairing(Array.isArray(p)?p:[]);renderActiveStreams(Array.isArray(a)?a:[]);
   const ok=h.gateway?.reachable&&h.search?.reachable;
   $('systemDot').style.background=ok?'var(--green)':'var(--red)';
   $('systemStatus').textContent=ok?'Gateway & Search bereit':'Service pr\u00fcfen';
